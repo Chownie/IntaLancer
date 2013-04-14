@@ -7,4 +7,5 @@ JINEG SKIP
 ADD NUMBER
 OUT
 SKIP JUMP BEGIN
+;end the application
 END HALT

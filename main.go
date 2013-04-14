@@ -61,7 +61,17 @@ func (I *Interpreter) LoadFile(filename string) {
 	splitCode := strings.Split(input, "\n")
 	code := []string{}
 	for i := 0; i < len(splitCode); i++ {
-		code = append(code, strings.Trim(splitCode[i], "\r\n"))
+		begin := strings.Trim(splitCode[i], "\r\n")
+		//append(code, strings.Trim(splitCode[i], "\r\n"))
+		pos := strings.Index(begin, ";")
+		if pos == 0 {
+			continue
+		} else if pos > 0 {
+			begin := strings.Split(begin, ";")[0]
+			code = append(code, begin)
+		} else {
+			code = append(code, begin)
+		}
 	}
 
 	I.Code = code
@@ -154,7 +164,7 @@ func Command(I *Interpreter, Line []string) {
 }
 
 func OUT(I *Interpreter, _ string) {
-	fmt.Println(Blue("<"), Reset(), I.Accum)
+	fmt.Println(Blue("<")+Reset(), I.Accum)
 }
 
 func STORE(I *Interpreter, address string) {
