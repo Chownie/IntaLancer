@@ -7,14 +7,15 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"flag"
 )
 
 var (
 	Instructions = map[string]func(*Interpreter, string){
-		"INC":		INC,
-		"RUN":		RUN,
-		"RET":		RET,
-		"AOUT":		AOUT,
+		"INC":      INC,
+		"RUN":      RUN,
+		"RET":      RET,
+		"AOUT":     AOUT,
 		"OUT":      OUT,
 		"IN":       IN,
 		"STORE":    STORE,
@@ -27,7 +28,13 @@ var (
 		"JINEG":    JINEG,
 		"JIZERO":   JIZERO,
 		"HALT":     HALT,
+		"XOR":      XOR,
+		"ANDNOT":   ANDNOT,
+		"OR":       OR,
 	}
+	DebugMode = false
+	DryRunSheet = false
+	DryRunFile = ""
 )
 
 type Interpreter struct {
@@ -37,25 +44,33 @@ type Interpreter struct {
 	LineP  int
 	Labels map[string]int
 	//Function specific jazz
-	Wait *sync.WaitGroup
+	Wait      *sync.WaitGroup
 	Functions map[string]*Interpreter
-	Parent *Interpreter
+	Parent    *Interpreter
 }
 
 func main() {
+	var filename string
+	flag.StringVar(&filename, "file","" , "The location of the file you wish to parse")
+	flag.BoolVar(&DebugMode, "debug", false, "Enables debugging. Disabled by default")
+	flag.BoolVar(&DryRunSheet, "dry", false, "Enables the creation of a Dry Run Sheet. Disabled by default")
+	flag.Parse()
+	if filename == "" {
+		os.Exit(1)
+	}
 	var wg sync.WaitGroup
 	Interp := Interpreter{0, map[string]int{}, []string{""}, 0, map[string]int{}, &wg, map[string]*Interpreter{}, &Interpreter{}}
-	Interp.LoadFile(os.Args[1])
+	Interp.LoadFile(filename)
 	Interp.PopulateLabels()
 	Interp.Run()
 }
 
 func (I *Interpreter) LoadFile(filename string) {
-    byteInput, fileErr := ioutil.ReadFile(filename)
-    if fileErr != nil {
-        fmt.Println(fileErr)
-        os.Exit(1)
-    }
+	byteInput, fileErr := ioutil.ReadFile(filename)
+	if fileErr != nil {
+		fmt.Println(fileErr)
+		os.Exit(1)
+	}
 
 	input := strings.TrimRight(string(byteInput), "\r\n")
 	splitCode := strings.Split(input, "\n")
@@ -90,6 +105,11 @@ func (I *Interpreter) PopulateLabels() {
 func (I *Interpreter) Run() {
 	for I.LineP = 0; I.LineP < len(I.Code); I.LineP++ {
 		Line := strings.Split(I.Code[I.LineP], " ")
+		if DebugMode == true {
+			fmt.Println("Instruction:", Line, "Accumulator:", I.Accum)
+		} else if DryRunSheet == true {
+				DryRunFile = fmt.Sprintf("%s%s %s %s %d\n", DryRunFile, "Instruction:", Line, "Accumulator:", I.Accum)
+		}
 		Command(I, Line)
 	}
 }
@@ -108,13 +128,25 @@ func (I *Interpreter) Run() {
     }
 }*/
 
+func (I *Interpreter) FindLabel(label string) {
+	if _, ok := I.Labels[label]; !ok {
+		fmt.Println("WARNING: label <" + label + "> does not exist")
+	}
+}
+
+func (I *Interpreter) FindVar(varname string) {
+	if _, ok := I.Data[varname]; !ok {
+		fmt.Println("WARNING: variable <" + varname + "> does not exist")
+	}
+}
+
 func AOUT(I *Interpreter, _ string) {
 	fmt.Println(Blue("<"), string(rune(I.Accum)), Reset())
 }
 
 func INC(I *Interpreter, location string) {
-    var wg sync.WaitGroup
-    Interp := Interpreter{0, map[string]int{}, []string{""}, 0, map[string]int{}, &wg, map[string]*Interpreter{}, &Interpreter{}}
+	var wg sync.WaitGroup
+	Interp := Interpreter{0, map[string]int{}, []string{""}, 0, map[string]int{}, &wg, map[string]*Interpreter{}, &Interpreter{}}
 	Interp.LoadFile(location)
 	Interp.PopulateLabels()
 	Interp.Parent = I
@@ -131,6 +163,22 @@ func RUN(I *Interpreter, name string) {
 func RET(I *Interpreter, _ string) {
 	I.Parent.Accum = I.Accum
 	I.Parent.Wait.Done()
+}
+
+func XOR(I *Interpreter, address string) {
+	I.Accum = I.Accum ^ I.Data[address]
+}
+
+func OR(I *Interpreter, address string) {
+	I.Accum = I.Accum | I.Data[address]
+}
+
+func AND(I *Interpreter, address string) {
+	I.Accum = I.Accum & I.Data[address]
+}
+
+func ANDNOT(I *Interpreter, address string) {
+	I.Accum = I.Accum &^ I.Data[address]
 }
 
 func IN(I *Interpreter, _ string) {
@@ -181,6 +229,7 @@ func LOAD(I *Interpreter, address string) {
 }
 
 func ADD(I *Interpreter, address string) {
+	I.FindVar(address)
 	integer, intErr := strconv.Atoi(address)
 	if intErr != nil {
 		I.Accum += I.Data[address]
@@ -190,6 +239,7 @@ func ADD(I *Interpreter, address string) {
 }
 
 func SUBTRACT(I *Interpreter, address string) {
+	I.FindVar(address)
 	integer, intErr := strconv.Atoi(address)
 	if intErr != nil {
 		I.Accum -= I.Data[address]
@@ -199,6 +249,7 @@ func SUBTRACT(I *Interpreter, address string) {
 }
 
 func MULTIPLY(I *Interpreter, address string) {
+	I.FindVar(address)
 	integer, intErr := strconv.Atoi(address)
 	if intErr != nil {
 		I.Accum = I.Accum * I.Data[address]
@@ -208,6 +259,7 @@ func MULTIPLY(I *Interpreter, address string) {
 }
 
 func DIVIDE(I *Interpreter, address string) {
+	I.FindVar(address)
 	integer, intErr := strconv.Atoi(address)
 	if intErr != nil {
 		I.Accum = I.Accum / I.Data[address]
@@ -217,21 +269,27 @@ func DIVIDE(I *Interpreter, address string) {
 }
 
 func JUMP(I *Interpreter, label string) {
+	I.FindLabel(label)
 	I.LineP = I.Labels[label] - 1
 }
 
 func JINEG(I *Interpreter, label string) {
+	I.FindLabel(label)
 	if I.Accum < 0 {
 		I.LineP = I.Labels[label] - 1
 	}
 }
 
 func JIZERO(I *Interpreter, label string) {
+	I.FindLabel(label)
 	if I.Accum == 0 {
 		I.LineP = I.Labels[label] - 1
 	}
 }
 
 func HALT(I *Interpreter, _ string) {
+	if DryRunSheet == true {
+		ioutil.WriteFile("dryrun.txt", []byte(DryRunFile), 0777)
+	}
 	os.Exit(0)
 }

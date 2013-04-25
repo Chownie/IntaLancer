@@ -1,0 +1,6 @@
+Instruction: [IN] Accumulator: 0
+Instruction: [STORE NUMBER] Accumulator: 100
+Instruction: [IN] Accumulator: 100
+Instruction: [ADD NUMBER] Accumulator: 200
+Instruction: [OUT] Accumulator: 300
+Instruction: [HALT] Accumulator: 300
